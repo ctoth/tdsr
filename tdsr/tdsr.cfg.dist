@@ -1,6 +1,7 @@
 [speech]
 process_symbols = False
 prompt = .*
+history_limit = 1000
 
 [commands]
 

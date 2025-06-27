@@ -370,10 +370,12 @@ def main(term_params):
 		synth.set_voice_idx(int(state.config['speech']['voice_idx']))
 	if 'cursor_delay' in state.config['speech']:
 		CURSOR_TIMEOUT = float(state.config['speech']['cursor_delay'])
+	# Get configurable history limit for scrollback
+	history_limit = state.config.getint('speech', 'history_limit', fallback=1000)
 	pid, fd = os.forkpty()
 	if pid == 0:
 		handle_child(args)
-	screen = MyScreen(cols, rows)
+	screen = MyScreen(cols, rows, history=history_limit)
 	pyte.Stream.csi['S'] = 'scroll_up'
 	pyte.Stream.csi['T'] = 'scroll_down'
 	stream = pyte.Stream()
@@ -489,11 +491,23 @@ def handle_plugin(plugin_name):
 
 	def handle():
 		lines = []
-		for i in reversed(range(len(screen.buffer))):
-			line = "".join(screen.buffer[i][x].data for x in range(screen.columns)).strip()
+		max_scrollback = len(screen.history.top) if hasattr(screen, 'history') else 0
+		
+		# First get lines from current screen (bottom to top)
+		for i in reversed(range(screen.lines)):
+			line = get_line(i).strip()
 			lines.append(line)
 			if prompt_matcher.search(line) and check_command and command_matcher.search(line):
 				break
+		
+		# If we haven't found the prompt/command pattern yet, check scrollback history
+		if not (check_command and command_matcher.search(lines[-1]) if lines else False):
+			for i in range(1, max_scrollback + 1):
+				line = get_line(-i).strip()
+				lines.append(line)
+				if prompt_matcher.search(line) and check_command and command_matcher.search(line):
+					break
+		
 		try:
 			lines_to_read = mod.parse_output(lines)
 			for line in lines_to_read:
