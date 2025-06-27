@@ -505,7 +505,7 @@ def handle_plugin(plugin_name):
 	return handle
 
 def sayline(y):
-	line = "".join(screen.buffer[y][x].data for x in range(screen.columns)).strip()
+	line = get_line(y)
 	if line == u'':
 		line = u'blank'
 
@@ -530,9 +530,13 @@ def replace_duplicate_characters_with_count(line):
 
 def prevline():
 	state.revy -= 1
-	if state.revy < 0:
+	# Check if we've gone past the available scrollback
+	max_scrollback = len(screen.history.top) if hasattr(screen, 'history') else 0
+	min_virtual_y = -max_scrollback
+	
+	if state.revy < min_virtual_y:
 		say("top")
-		state.revy = 0
+		state.revy = min_virtual_y
 	sayline(state.revy)
 
 def nextline():
@@ -586,7 +590,7 @@ def endOfLine():
 	state.revx = screen.columns - 1
 	saychar(state.revy, state.revx)
 
-class MyScreen(pyte.Screen):
+class MyScreen(pyte.HistoryScreen):
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -690,6 +694,34 @@ class MyScreen(pyte.Screen):
 		for i in range(count):
 			self.index()
 		self.cursor.y = y
+
+def get_line(virtual_y):
+	"""Get line text using virtual coordinates.
+	
+	Virtual coordinates:
+	- Negative values: scrollback history (e.g., -1 = most recent scrollback line)
+	- 0 to screen.lines-1: current visible screen
+	
+	Returns:
+		str: Line content, or empty string if line doesn't exist
+	"""
+	if virtual_y < 0:
+		# Access scrollback history
+		history_index = abs(virtual_y) - 1
+		if hasattr(screen, 'history') and len(screen.history.top) > history_index:
+			# Get line from history (history.top is a deque, most recent at end)
+			history_line_dict = screen.history.top[-(history_index + 1)]
+			# Extract characters from the line dictionary
+			chars = []
+			for col in sorted(history_line_dict.keys()):
+				chars.append(history_line_dict[col].data)
+			return "".join(chars).rstrip()
+		return ""
+	elif 0 <= virtual_y < screen.lines:
+		# Access current screen
+		return "".join(screen.buffer[virtual_y][x].data for x in range(screen.columns)).rstrip()
+	else:
+		return ""
 
 def sb():
 	data = speech_buffer.getvalue()
