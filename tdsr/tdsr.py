@@ -555,7 +555,7 @@ def prevchar():
 	saychar(state.revy, state.revx)
 
 def saychar(y, x, phonetically=False):
-	char = screen.buffer[y][x].data
+	char = get_char_at(y, x)
 	lchar = char.lower()
 	if phonetically and lchar in PHONETICS:
 		synth.send('s%s\n' % PHONETICS[lchar])
@@ -563,7 +563,8 @@ def saychar(y, x, phonetically=False):
 		say_character(char)
 
 def nextchar():
-	state.revx += wcwidth(screen.buffer[state.revy][state.revx].data)
+	current_char = get_char_at(state.revy, state.revx)
+	state.revx += wcwidth(current_char) if current_char else 1
 	if state.revx > screen.columns - 1:
 		say("right")
 		state.revx = screen.columns - 1
@@ -571,7 +572,7 @@ def nextchar():
 	saychar(state.revy, state.revx)
 
 def skip_to_previous_char():
-	while screen.buffer[state.revy][state.revx].data == '':
+	while get_char_at(state.revy, state.revx) == '':
 		state.revx -= 1
 
 def topOfScreen():
@@ -723,6 +724,33 @@ def get_line(virtual_y):
 	else:
 		return ""
 
+def get_char_at(virtual_y, x):
+	"""Get character at virtual coordinates.
+	
+	Args:
+		virtual_y: Virtual line coordinate (negative for history, positive for current screen)
+		x: Column coordinate (0 to screen.columns-1)
+	
+	Returns:
+		str: Character at position, or empty string if position doesn't exist
+	"""
+	if x < 0 or x >= screen.columns:
+		return ""
+	
+	if virtual_y < 0:
+		# Access scrollback history
+		history_index = abs(virtual_y) - 1
+		if hasattr(screen, 'history') and len(screen.history.top) > history_index:
+			history_line_dict = screen.history.top[-(history_index + 1)]
+			if x in history_line_dict:
+				return history_line_dict[x].data
+		return ""
+	elif 0 <= virtual_y < screen.lines:
+		# Access current screen
+		return screen.buffer[virtual_y][x].data
+	else:
+		return ""
+
 def sb():
 	data = speech_buffer.getvalue()
 	speech_buffer.truncate(0)
@@ -801,12 +829,16 @@ def copy_mode():
 	state.key_handlers.append(CopyHandler())
 
 def get_char():
-	return screen.buffer[state.revy][state.revx].data
+	return get_char_at(state.revy, state.revx)
 
 def move_prevchar():
 	if state.revx == 0:
-		if state.revy == 0:
-			return ''
+		# At beginning of line, move to end of previous line
+		max_scrollback = len(screen.history.top) if hasattr(screen, 'history') else 0
+		min_virtual_y = -max_scrollback
+		
+		if state.revy <= min_virtual_y:
+			return ''  # At very beginning of history
 		state.revy -= 1
 		state.revx = screen.columns - 1
 	else:
@@ -814,8 +846,9 @@ def move_prevchar():
 
 def move_nextchar():
 	if state.revx == screen.columns - 1:
+		# At end of line, move to beginning of next line
 		if state.revy == screen.lines - 1:
-			return ''
+			return ''  # At bottom of current screen
 		state.revy += 1
 		state.revx = 0
 	else:
@@ -833,15 +866,14 @@ def prevword():
 	while state.revx > 0 and get_char() == ' ':
 		move_prevchar()
 	#Move to the beginning of the word we're now on
-	while state.revx > 0 and get_char() != ' ' and screen.buffer[state.revy][state.revx - 1].data != ' ':
+	while state.revx > 0 and get_char() != ' ' and get_char_at(state.revy, state.revx - 1) != ' ':
 		move_prevchar()
 	sayword()
 
 def sayword(spell=False):
 	word = ""
 	revx, revy = state.revx, state.revy
-	b = screen.buffer
-	while state.revx > 0 and get_char() != ' ' and b[state.revy][state.revx - 1].data != ' ':
+	while state.revx > 0 and get_char() != ' ' and get_char_at(state.revy, state.revx - 1) != ' ':
 		move_prevchar()
 	if state.revx == 0 and get_char() == ' ':
 		say("space")
