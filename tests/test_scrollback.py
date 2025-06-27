@@ -173,5 +173,193 @@ class TestScrollbackEdgeCases(unittest.TestCase):
         self.assertEqual(line, "Only line 1")
 
 
+class TestScrollbackCharacterNavigation(unittest.TestCase):
+    """Test character navigation in scrollback history."""
+    
+    def setUp(self):
+        """Set up test environment with history."""
+        self.screen = pyte.HistoryScreen(80, 3)
+        self.stream = pyte.Stream(self.screen)
+        
+        # Create content with scrollback
+        lines = [
+            "history word1 word2",
+            "another line here",
+            "current line 1",
+            "current line 2", 
+            "current line 3"
+        ]
+        
+        for i, line in enumerate(lines):
+            if i > 0:
+                self.stream.feed("\r\n")
+            self.stream.feed(line)
+        
+        # Set up tdsr globals
+        tdsr.screen = self.screen
+        tdsr.synth = mock.MagicMock()
+        tdsr.state.revy = -2  # Start in scrollback
+        tdsr.state.revx = 0
+    
+    def test_get_char_at_scrollback(self):
+        """Test get_char_at function with scrollback coordinates."""
+        # Test accessing characters in scrollback history
+        char = tdsr.get_char_at(-2, 0)  # First char of oldest history line
+        self.assertEqual(char, "h")  # "history word1 word2"
+        
+        char = tdsr.get_char_at(-2, 7)  # Space after "history"
+        self.assertEqual(char, " ")
+        
+        char = tdsr.get_char_at(-1, 0)  # First char of recent history line
+        self.assertEqual(char, "a")  # "another line here"
+    
+    def test_get_char_at_current_screen(self):
+        """Test get_char_at function with current screen coordinates."""
+        char = tdsr.get_char_at(0, 0)
+        self.assertEqual(char, "c")  # "current line 1"
+        
+        char = tdsr.get_char_at(1, 8)
+        self.assertEqual(char, "l")  # "current line 2"
+    
+    def test_get_char_at_invalid_coordinates(self):
+        """Test get_char_at handles invalid coordinates."""
+        # Invalid line coordinates
+        char = tdsr.get_char_at(-10, 0)
+        self.assertEqual(char, "")
+        
+        char = tdsr.get_char_at(10, 0)
+        self.assertEqual(char, "")
+        
+        # Invalid column coordinates
+        char = tdsr.get_char_at(0, -1)
+        self.assertEqual(char, "")
+        
+        char = tdsr.get_char_at(0, 100)
+        self.assertEqual(char, "")
+    
+    @mock.patch('tdsr.tdsr.say_character')
+    def test_saychar_in_scrollback(self, mock_say_char):
+        """Test saychar function works in scrollback."""
+        # Say a character from scrollback
+        tdsr.saychar(-2, 0)  # First char of "history word1 word2"
+        mock_say_char.assert_called_once_with("h")
+        
+        # Say a character from current screen
+        mock_say_char.reset_mock()
+        tdsr.saychar(0, 0)  # First char of "current line 1"
+        mock_say_char.assert_called_once_with("c")
+    
+    @mock.patch('tdsr.tdsr.say_character')
+    def test_character_navigation_across_scrollback(self, mock_say_char):
+        """Test character navigation moves correctly across scrollback boundaries."""
+        # Start at beginning of scrollback line
+        tdsr.state.revy = -2
+        tdsr.state.revx = 0
+        
+        # Move right and verify character
+        tdsr.nextchar()
+        self.assertEqual(tdsr.state.revy, -2)
+        self.assertEqual(tdsr.state.revx, 1)
+        mock_say_char.assert_called_with("i")  # Second char of "history"
+    
+    def test_get_char_convenience_function(self):
+        """Test get_char() convenience function with current state position."""
+        # Set position in scrollback
+        tdsr.state.revy = -2
+        tdsr.state.revx = 7
+        
+        char = tdsr.get_char()
+        self.assertEqual(char, " ")  # Space after "history"
+        
+        # Set position in current screen
+        tdsr.state.revy = 0
+        tdsr.state.revx = 0
+        
+        char = tdsr.get_char()
+        self.assertEqual(char, "c")  # First char of "current line 1"
+
+
+class TestScrollbackWordNavigation(unittest.TestCase):
+    """Test word navigation in scrollback history."""
+    
+    def setUp(self):
+        """Set up test environment with words in history."""
+        self.screen = pyte.HistoryScreen(80, 3) 
+        self.stream = pyte.Stream(self.screen)
+        
+        # Create content with clear word boundaries
+        lines = [
+            "first second third",  # Will be in history
+            "alpha beta gamma",    # Will be in history
+            "current words here",  # Current screen
+            "more text content",   # Current screen
+            "final line end"       # Current screen
+        ]
+        
+        for i, line in enumerate(lines):
+            if i > 0:
+                self.stream.feed("\r\n")
+            self.stream.feed(line)
+        
+        # Set up tdsr globals
+        tdsr.screen = self.screen
+        tdsr.synth = mock.MagicMock()
+        tdsr.state.revy = -2  # Start in scrollback
+        tdsr.state.revx = 0
+    
+    @mock.patch('tdsr.tdsr.say')
+    def test_sayword_in_scrollback(self, mock_say):
+        """Test sayword works correctly in scrollback history."""
+        # Position at start of word in scrollback
+        tdsr.state.revy = -2
+        tdsr.state.revx = 0  # At "first"
+        
+        tdsr.sayword()
+        mock_say.assert_called_once_with("first")
+        
+        # Position at middle of word in scrollback  
+        mock_say.reset_mock()
+        tdsr.state.revy = -2
+        tdsr.state.revx = 2  # In middle of "first"
+        
+        tdsr.sayword()
+        mock_say.assert_called_once_with("first")
+    
+    @mock.patch('tdsr.tdsr.say')
+    def test_sayword_spell_in_scrollback(self, mock_say):
+        """Test sayword with spelling in scrollback."""
+        tdsr.state.revy = -1
+        tdsr.state.revx = 0  # At "alpha"
+        
+        tdsr.sayword(spell=True)
+        mock_say.assert_called_once_with("a l p h a", force_process_symbols=True)
+    
+    def test_move_prevchar_across_line_boundary_in_scrollback(self):
+        """Test move_prevchar can cross line boundaries in scrollback."""
+        # Start at beginning of a scrollback line
+        tdsr.state.revy = -1
+        tdsr.state.revx = 0
+        
+        # Move to previous character (should go to end of previous line)
+        result = tdsr.move_prevchar()
+        
+        self.assertEqual(tdsr.state.revy, -2)  # Previous line
+        self.assertEqual(tdsr.state.revx, 79)  # End of line
+    
+    def test_move_prevchar_at_history_boundary(self):
+        """Test move_prevchar at very beginning of history."""
+        # Start at very beginning of history
+        tdsr.state.revy = -2
+        tdsr.state.revx = 0
+        
+        # Try to move further back
+        result = tdsr.move_prevchar()
+        
+        # Should return empty string and not move
+        self.assertEqual(result, '')
+        self.assertEqual(tdsr.state.revy, -2)
+        self.assertEqual(tdsr.state.revx, 0)
+
+
 if __name__ == '__main__':
     unittest.main()
