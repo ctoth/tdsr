@@ -89,7 +89,10 @@ class TestScrollbackFunctionality(unittest.TestCase):
         
         # Should now be at y=-1 (most recent history line)
         self.assertEqual(tdsr.state.revy, -1)
-        mock_say.assert_called_once_with("History line 3")
+        # Should announce entering scrollback and speak the line with position
+        self.assertEqual(mock_say.call_count, 2)
+        mock_say.assert_any_call("entering scrollback")
+        mock_say.assert_any_call("scrollback line 1: History line 3")
     
     @mock.patch('tdsr.tdsr.say')
     def test_prevline_scrollback_boundary(self, mock_say):
@@ -100,9 +103,10 @@ class TestScrollbackFunctionality(unittest.TestCase):
         # Try to go further back
         tdsr.prevline()
         
-        # Should stay at oldest line and say "top"
+        # Should stay at oldest line and say "top of scrollback"
         self.assertEqual(tdsr.state.revy, -3)
-        mock_say.assert_any_call("top")
+        mock_say.assert_any_call("top of scrollback")
+        mock_say.assert_any_call("scrollback line 3: History line 1")
     
     @mock.patch('tdsr.tdsr.say')
     def test_nextline_from_scrollback(self, mock_say):
@@ -115,16 +119,19 @@ class TestScrollbackFunctionality(unittest.TestCase):
         
         # Should now be at y=0 (current screen)
         self.assertEqual(tdsr.state.revy, 0)
-        mock_say.assert_called_once_with("Current line 1")
+        # Should announce returning to current screen and speak the line
+        self.assertEqual(mock_say.call_count, 2)
+        mock_say.assert_any_call("back to current screen")
+        mock_say.assert_any_call("Current line 1")
     
     @mock.patch('tdsr.tdsr.say')
     def test_sayline_with_scrollback(self, mock_say):
         """Test sayline works with virtual coordinates."""
-        # Test saying a line from scrollback
+        # Test saying a line from scrollback (includes position indicator)
         tdsr.sayline(-2)
-        mock_say.assert_called_once_with("History line 2")
+        mock_say.assert_called_once_with("scrollback line 2: History line 2")
         
-        # Reset mock and test current screen
+        # Reset mock and test current screen (no position indicator)
         mock_say.reset_mock()
         tdsr.sayline(1)
         mock_say.assert_called_once_with("Current line 2")
@@ -156,11 +163,12 @@ class TestScrollbackEdgeCases(unittest.TestCase):
         # Start at top of screen
         tdsr.state.revy = 0
         
-        # Try to go up - should stay at 0 and say "top"
+        # Try to go up - should stay at 0 and say "top of scrollback"
         tdsr.prevline()
         
         self.assertEqual(tdsr.state.revy, 0)
-        mock_say.assert_any_call("top")
+        mock_say.assert_any_call("top of scrollback")
+        mock_say.assert_any_call("Only line 1")
     
     def test_get_line_no_history(self):
         """Test get_line when there's no scrollback history."""

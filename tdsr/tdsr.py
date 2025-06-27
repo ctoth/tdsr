@@ -511,7 +511,16 @@ def sayline(y):
 
 	new_line = replace_duplicate_characters_with_count(line)
 
-	say(new_line)
+	# Add scrollback position context for accessibility
+	if y < 0:
+		# In scrollback history
+		max_scrollback = len(screen.history.top) if hasattr(screen, 'history') else 0
+		position_from_current = abs(y)
+		context = f"scrollback line {position_from_current}"
+		say(f"{context}: {new_line}")
+	else:
+		# On current screen
+		say(new_line)
 
 
 def replace_duplicate_characters_with_count(line):
@@ -535,15 +544,22 @@ def prevline():
 	min_virtual_y = -max_scrollback
 	
 	if state.revy < min_virtual_y:
-		say("top")
+		say("top of scrollback")
 		state.revy = min_virtual_y
+	# Announce when entering scrollback from current screen
+	elif state.revy == -1 and max_scrollback > 0:
+		say("entering scrollback")
 	sayline(state.revy)
 
 def nextline():
+	prev_y = state.revy
 	state.revy += 1
 	if state.revy > screen.lines - 1:
-		say("bottom")
+		say("bottom of screen")
 		state.revy = screen.lines - 1
+	# Announce when exiting scrollback to current screen
+	elif prev_y < 0 and state.revy == 0:
+		say("back to current screen")
 	sayline(state.revy)
 
 def prevchar():

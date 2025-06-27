@@ -54,9 +54,9 @@ class TestLineNavigation(unittest.TestCase):
         tdsr.prevline()
         
         self.assertEqual(tdsr.state.revy, 0)  # Should stay at 0
-        # Check that both "top" and the line content are spoken
+        # Check that both "top of scrollback" and the line content are spoken
         self.assertEqual(mock_say.call_count, 2)
-        mock_say.assert_any_call("top")
+        mock_say.assert_any_call("top of scrollback")
         mock_say.assert_any_call("Line 0: First line")
     
     @mock.patch('tdsr.tdsr.say')
@@ -76,9 +76,9 @@ class TestLineNavigation(unittest.TestCase):
         tdsr.nextline()
         
         self.assertEqual(tdsr.state.revy, 4)  # Should stay at 4
-        # Check that both "bottom" and the line content are spoken
+        # Check that both "bottom of screen" and the line content are spoken
         self.assertEqual(mock_say.call_count, 2)
-        mock_say.assert_any_call("bottom")
+        mock_say.assert_any_call("bottom of screen")
         mock_say.assert_any_call("Line 4: Fifth line")
 
 
