@@ -536,7 +536,10 @@ def prevline():
 	min_virtual_y = -max_scrollback
 	
 	if state.revy < min_virtual_y:
-		say("top of scrollback")
+		if max_scrollback > 0:
+			say("top of scrollback")
+		else:
+			say("top of screen")
 		state.revy = min_virtual_y
 	# Announce when entering scrollback from current screen
 	elif state.revy == -1 and max_scrollback > 0:
@@ -887,7 +890,11 @@ def sayword(spell=False):
 		say("space")
 		return
 	word += get_char()
-	while state.revx < screen.columns - 1:
+	# Build word by moving forward, handling line boundaries properly
+	while True:
+		# Check if we're at end of current screen (can't go further)
+		if state.revy == screen.lines - 1 and state.revx == screen.columns - 1:
+			break
 		move_nextchar()
 		if get_char() == ' ':
 			break
@@ -900,18 +907,23 @@ def sayword(spell=False):
 
 def nextword():
 	revx, revy = state.revx, state.revy
-	m = screen.columns - 1
-	#Move over any existing word we might be in the middle of
-	while state.revx < m and get_char() != ' ':
+	# Move over any existing word we might be in the middle of
+	while get_char() != ' ':
+		# Check if we're at end of current screen
+		if state.revy == screen.lines - 1 and state.revx == screen.columns - 1:
+			break
 		move_nextchar()
-	#Skip whitespace
-	while state.revx < m and get_char() == ' ':
+	
+	# Skip whitespace
+	while get_char() == ' ':
+		# Check if we're at end of current screen
+		if state.revy == screen.lines - 1 and state.revx == screen.columns - 1:
+			say("right")  # Reached end of buffer
+			state.revx, state.revy = revx, revy
+			sayword()
+			return
 		move_nextchar()
-	if state.revx == m and get_char() == ' ':
-		say("right")
-		state.revx = revx
-		sayword()
-		return
+	
 	sayword()
 
 def handle_silence():
@@ -934,26 +946,41 @@ def handle_clipboard():
 	state.copy_x = None
 
 def copy_text(start_y, start_x, end_y, end_x):
-	if start_x > end_x:
-		start_x, end_x = end_x, start_x
-	if start_y > end_y:
+	# Ensure coordinates are in correct order
+	if start_y > end_y or (start_y == end_y and start_x > end_x):
 		start_y, end_y = end_y, start_y
-	display = screen.display
+		start_x, end_x = end_x, start_x
+
 	buf = []
-	start = start_x
 	for y in range(start_y, end_y + 1):
-		if y < end_y:
-			end = screen.columns - 1
+		# Get the full line using virtual coordinates
+		line = get_line(y)
+		
+		# Determine start and end columns for this line
+		line_start_x = 0
+		if y == start_y:
+			line_start_x = start_x
+
+		line_end_x = len(line)
+		if y == end_y:
+			line_end_x = min(end_x + 1, len(line))  # +1 for inclusive end
+
+		# Extract the relevant portion of the line
+		if start_y == end_y:
+			# Single line selection
+			buf.append(line[line_start_x:line_end_x])
 		else:
-			end = end_x
-		if y > start_y:
-			start = 0
-		chars = []
-		for x in range(start, end + 1):
-			chars.append(screen.buffer[y][x].data)
-		buf.append("".join(chars).rstrip())
-	buf = "\n".join(buf)
-	copy_to_clip(buf)
+			# Multi-line selection
+			if y == start_y:
+				buf.append(line[line_start_x:])
+			elif y == end_y:
+				buf.append(line[:line_end_x])
+			else:
+				# Full line in between
+				buf.append(line)
+
+	buf_str = "\n".join(buf)
+	copy_to_clip(buf_str)
 
 def copy_to_clip(data):
 	data = data.encode('utf-8')

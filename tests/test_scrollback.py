@@ -163,11 +163,11 @@ class TestScrollbackEdgeCases(unittest.TestCase):
         # Start at top of screen
         tdsr.state.revy = 0
         
-        # Try to go up - should stay at 0 and say "top of scrollback"
+        # Try to go up - should stay at 0 and say "top of screen" when no history
         tdsr.prevline()
         
         self.assertEqual(tdsr.state.revy, 0)
-        mock_say.assert_any_call("top of scrollback")
+        mock_say.assert_any_call("top of screen")
         mock_say.assert_any_call("Only line 1")
     
     def test_get_line_no_history(self):

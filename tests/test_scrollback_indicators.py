@@ -152,9 +152,9 @@ class TestScrollbackIndicatorsWithoutHistory(unittest.TestCase):
         # Try to go up
         tdsr.prevline()
         
-        # Should stay at top and say "top of scrollback"
+        # Should stay at top and say "top of screen" when no history
         self.assertEqual(tdsr.state.revy, 0)
-        mock_say.assert_any_call("top of scrollback")
+        mock_say.assert_any_call("top of screen")
         mock_say.assert_any_call("Only line 1")
     
     @mock.patch('tdsr.tdsr.say')
