@@ -511,16 +511,8 @@ def sayline(y):
 
 	new_line = replace_duplicate_characters_with_count(line)
 
-	# Add scrollback position context for accessibility
-	if y < 0:
-		# In scrollback history
-		max_scrollback = len(screen.history.top) if hasattr(screen, 'history') else 0
-		position_from_current = abs(y)
-		context = f"scrollback line {position_from_current}"
-		say(f"{context}: {new_line}")
-	else:
-		# On current screen
-		say(new_line)
+	# Just speak the line content - position context is handled by navigation functions
+	say(new_line)
 
 
 def replace_duplicate_characters_with_count(line):

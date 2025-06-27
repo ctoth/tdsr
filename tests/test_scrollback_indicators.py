@@ -43,16 +43,16 @@ class TestScrollbackPositionIndicators(unittest.TestCase):
         tdsr.state.revx = 0
     
     @mock.patch('tdsr.tdsr.say')
-    def test_sayline_scrollback_position_indicator(self, mock_say):
-        """Test sayline includes position indicator for scrollback lines."""
-        # Test scrollback line includes position context
+    def test_sayline_no_position_spam(self, mock_say):
+        """Test sayline doesn't spam position indicators on every line."""
+        # sayline should just speak content, not position indicators
         tdsr.sayline(-1)
-        mock_say.assert_called_once_with("scrollback line 1: Old line 2")
+        mock_say.assert_called_once_with("Old line 2")
         
         # Test deeper scrollback line
         mock_say.reset_mock()
         tdsr.sayline(-2)
-        mock_say.assert_called_once_with("scrollback line 2: Old line 1")
+        mock_say.assert_called_once_with("Old line 1")
     
     @mock.patch('tdsr.tdsr.say')
     def test_sayline_current_screen_no_indicator(self, mock_say):
@@ -78,7 +78,7 @@ class TestScrollbackPositionIndicators(unittest.TestCase):
         self.assertEqual(tdsr.state.revy, -1)
         self.assertEqual(mock_say.call_count, 2)
         mock_say.assert_any_call("entering scrollback")
-        mock_say.assert_any_call("scrollback line 1: Old line 2")
+        mock_say.assert_any_call("Old line 2")
     
     @mock.patch('tdsr.tdsr.say')
     def test_nextline_exiting_scrollback_announcement(self, mock_say):
@@ -107,7 +107,7 @@ class TestScrollbackPositionIndicators(unittest.TestCase):
         # Should stay at boundary and announce top of scrollback
         self.assertEqual(tdsr.state.revy, -2)
         mock_say.assert_any_call("top of scrollback")
-        mock_say.assert_any_call("scrollback line 2: Old line 1")
+        mock_say.assert_any_call("Old line 1")
     
     @mock.patch('tdsr.tdsr.say')
     def test_nextline_current_screen_boundary_indicator(self, mock_say):
@@ -191,11 +191,11 @@ class TestScrollbackIndicatorsEdgeCases(unittest.TestCase):
         tdsr.state.revx = 0
     
     @mock.patch('tdsr.tdsr.say')
-    def test_single_scrollback_line_indicator(self, mock_say):
-        """Test position indicator with only one line of scrollback."""
-        # Test the single scrollback line
+    def test_single_scrollback_line_no_spam(self, mock_say):
+        """Test sayline doesn't spam position indicators even with minimal scrollback."""
+        # Test the single scrollback line - should just speak content
         tdsr.sayline(-1)
-        mock_say.assert_called_once_with("scrollback line 1: History line")
+        mock_say.assert_called_once_with("History line")
     
     @mock.patch('tdsr.tdsr.say')
     def test_scrollback_navigation_with_minimal_history(self, mock_say):
@@ -207,7 +207,7 @@ class TestScrollbackIndicatorsEdgeCases(unittest.TestCase):
         tdsr.prevline()
         self.assertEqual(mock_say.call_count, 2)
         mock_say.assert_any_call("entering scrollback")
-        mock_say.assert_any_call("scrollback line 1: History line")
+        mock_say.assert_any_call("History line")
         
         # Try to go further back (should hit boundary)
         mock_say.reset_mock()
