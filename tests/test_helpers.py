@@ -7,45 +7,7 @@ import importlib.util
 import pyte
 
 
-def import_tdsr_as_module():
-    """
-    Imports the 'tdsr' executable script as a Python module.
-
-    This function handles the complexities of loading a non-.py file,
-    ensuring that __file__ is set correctly so the script's internal
-    path logic works as expected.
-
-    It caches the imported module in sys.modules, so subsequent calls
-    do not re-execute the script.
-    """
-    # 1. Check if already imported to avoid re-execution.
-    if 'tdsr' in sys.modules:
-        return sys.modules['tdsr']
-
-    # 2. Define paths. This assumes test_helpers.py is in tests/
-    #    and tdsr is in the parent directory.
-    tests_dir = os.path.dirname(__file__)
-    project_root = os.path.dirname(tests_dir)
-    tdsr_path = os.path.join(project_root, 'tdsr')
-
-    if not os.path.exists(tdsr_path):
-        raise FileNotFoundError(f"Could not find 'tdsr' executable at {tdsr_path}")
-
-    # 3. Create a module spec from the file location.
-    spec = importlib.util.spec_from_file_location('tdsr', tdsr_path)
-    if spec is None:
-        raise ImportError(f"Could not create module spec for {tdsr_path}")
-
-    # 4. Create a new module based on the spec.
-    tdsr_module = importlib.util.module_from_spec(spec)
-
-    # 5. Add the module to sys.modules BEFORE execution.
-    sys.modules['tdsr'] = tdsr_module
-
-    # 6. Execute the module's code in its own namespace.
-    spec.loader.exec_module(tdsr_module)
-
-    return tdsr_module
+# No longer needed - TDSR is now a proper package!
 
 
 def create_test_screen(columns=80, lines=24, content=None):
@@ -63,8 +25,10 @@ def create_test_screen(columns=80, lines=24, content=None):
     stream = pyte.Stream(screen)
     
     if content:
-        for line in content:
-            stream.feed(line + "\r\n")
+        for i, line in enumerate(content):
+            if i > 0:
+                stream.feed("\r\n")
+            stream.feed(line)
     else:
         # Default test content
         stream.feed("Line 1: Test content\r\n")

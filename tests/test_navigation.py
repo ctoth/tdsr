@@ -7,10 +7,9 @@ before and after implementing scrollback functionality.
 import unittest
 from unittest import mock
 
-from tests.test_helpers import create_test_screen, get_screen_line_text, import_tdsr_as_module
-
-# Import tdsr module using centralized helper
-tdsr = import_tdsr_as_module()
+# Now we can import tdsr directly!
+import tdsr.tdsr as tdsr
+from tests.test_helpers import create_test_screen, get_screen_line_text
 
 
 class TestLineNavigation(unittest.TestCase):
@@ -30,11 +29,15 @@ class TestLineNavigation(unittest.TestCase):
         # Replace the global screen object in tdsr with our test screen
         tdsr.screen = self.screen
         
+        # Mock the synth object to avoid undefined errors
+        self.mock_synth = mock.MagicMock()
+        tdsr.synth = self.mock_synth
+        
         # Reset state for consistent testing
         tdsr.state.revy = 2  # Start at middle line
         tdsr.state.revx = 0
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_prevline_normal_movement(self, mock_say):
         """Test prevline moves up one line and speaks correctly."""
         # Starting at line 2, move to line 1
@@ -43,7 +46,7 @@ class TestLineNavigation(unittest.TestCase):
         self.assertEqual(tdsr.state.revy, 1)
         mock_say.assert_called_once_with("Line 1: Second line")
     
-    @mock.patch('tdsr.say') 
+    @mock.patch('tdsr.tdsr.say') 
     def test_prevline_at_top_boundary(self, mock_say):
         """Test prevline at top of screen stays at top and says 'top'."""
         tdsr.state.revy = 0  # Set to top line
@@ -51,9 +54,12 @@ class TestLineNavigation(unittest.TestCase):
         tdsr.prevline()
         
         self.assertEqual(tdsr.state.revy, 0)  # Should stay at 0
-        mock_say.assert_called_once_with("top")
+        # Check that both "top" and the line content are spoken
+        self.assertEqual(mock_say.call_count, 2)
+        mock_say.assert_any_call("top")
+        mock_say.assert_any_call("Line 0: First line")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_nextline_normal_movement(self, mock_say):
         """Test nextline moves down one line and speaks correctly."""
         # Starting at line 2, move to line 3
@@ -62,7 +68,7 @@ class TestLineNavigation(unittest.TestCase):
         self.assertEqual(tdsr.state.revy, 3)
         mock_say.assert_called_once_with("Line 3: Fourth line")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_nextline_at_bottom_boundary(self, mock_say):
         """Test nextline at bottom of screen stays at bottom and says 'bottom'."""
         tdsr.state.revy = 4  # Set to bottom line (screen.lines - 1)
@@ -70,7 +76,10 @@ class TestLineNavigation(unittest.TestCase):
         tdsr.nextline()
         
         self.assertEqual(tdsr.state.revy, 4)  # Should stay at 4
-        mock_say.assert_called_once_with("bottom")
+        # Check that both "bottom" and the line content are spoken
+        self.assertEqual(mock_say.call_count, 2)
+        mock_say.assert_any_call("bottom")
+        mock_say.assert_any_call("Line 4: Fifth line")
 
 
 class TestCharacterNavigation(unittest.TestCase):
@@ -85,10 +94,11 @@ class TestCharacterNavigation(unittest.TestCase):
         ])
         
         tdsr.screen = self.screen
+        tdsr.synth = mock.MagicMock()  # Mock synth
         tdsr.state.revy = 0
         tdsr.state.revx = 5  # Start at 'w' in "Hello world"
     
-    @mock.patch('tdsr.say_character')
+    @mock.patch('tdsr.tdsr.say_character')
     def test_prevchar_normal_movement(self, mock_say_char):
         """Test prevchar moves left one character."""
         tdsr.prevchar()
@@ -98,7 +108,7 @@ class TestCharacterNavigation(unittest.TestCase):
         char_at_pos = self.screen.buffer[tdsr.state.revy][tdsr.state.revx].data
         mock_say_char.assert_called_once_with(char_at_pos)
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_prevchar_at_left_boundary(self, mock_say):
         """Test prevchar at left edge says 'left' and stays put."""
         tdsr.state.revx = 0  # Set to leftmost position
@@ -108,7 +118,7 @@ class TestCharacterNavigation(unittest.TestCase):
         self.assertEqual(tdsr.state.revx, 0)  # Should stay at 0
         mock_say.assert_called_once_with("left")
     
-    @mock.patch('tdsr.say_character')
+    @mock.patch('tdsr.tdsr.say_character')
     def test_nextchar_normal_movement(self, mock_say_char):
         """Test nextchar moves right one character."""
         tdsr.nextchar()
@@ -117,7 +127,7 @@ class TestCharacterNavigation(unittest.TestCase):
         char_at_pos = self.screen.buffer[tdsr.state.revy][tdsr.state.revx].data
         mock_say_char.assert_called_once_with(char_at_pos)
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_nextchar_at_right_boundary(self, mock_say):
         """Test nextchar at right edge says 'right' and stays put."""
         tdsr.state.revx = 79  # Set to rightmost position
@@ -140,17 +150,18 @@ class TestWordNavigation(unittest.TestCase):
         ])
         
         tdsr.screen = self.screen
+        tdsr.synth = mock.MagicMock()  # Mock synth
         tdsr.state.revy = 0
         tdsr.state.revx = 0  # Start at beginning
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayword_at_beginning(self, mock_say):
         """Test sayword speaks the current word."""
         tdsr.sayword()
         
         mock_say.assert_called_once_with("word1")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayword_spell_mode(self, mock_say):
         """Test sayword with spelling enabled."""
         tdsr.sayword(spell=True)
@@ -158,7 +169,7 @@ class TestWordNavigation(unittest.TestCase):
         # Should call say with each character separated by spaces
         mock_say.assert_called_once_with("w o r d 1")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_nextword_movement(self, mock_say):
         """Test nextword moves to next word and speaks it."""
         tdsr.nextword()
@@ -166,7 +177,7 @@ class TestWordNavigation(unittest.TestCase):
         # Should move to "word2" and speak it
         mock_say.assert_called_once_with("word2")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_prevword_movement(self, mock_say):
         """Test prevword moves to previous word."""
         # Start at word2 position

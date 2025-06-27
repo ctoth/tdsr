@@ -7,10 +7,22 @@ before and after implementing scrollback functionality.
 import unittest
 from unittest import mock
 
-from tests.test_helpers import create_test_screen, get_screen_line_text, import_tdsr_as_module
+# Now we can import tdsr directly!
+import tdsr.tdsr as tdsr
+from tests.test_helpers import create_test_screen, get_screen_line_text
 
-# Import tdsr module using centralized helper
-tdsr = import_tdsr_as_module()
+
+# Common setup for all test classes
+def setup_tdsr_globals(test_instance):
+    """Setup common tdsr globals for testing."""
+    tdsr.screen = test_instance.screen
+    tdsr.synth = mock.MagicMock()
+    # Ensure state has proper defaults
+    if not hasattr(tdsr.state, 'config'):
+        tdsr.state.config = {'speech': {
+            'repeated_symbols': 'false',
+            'repeated_symbols_values': '-=!#'
+        }}
 
 
 class TestSaylineFunction(unittest.TestCase):
@@ -26,32 +38,32 @@ class TestSaylineFunction(unittest.TestCase):
             "    Indented line"  # Line with leading spaces
         ])
         
-        tdsr.screen = self.screen
+        setup_tdsr_globals(self)
         tdsr.state.revy = 0
         tdsr.state.revx = 0
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayline_with_content(self, mock_say):
         """Test sayline speaks the correct line content."""
         tdsr.sayline(0)  # Say first line
         
         mock_say.assert_called_once_with("First line content")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayline_empty_line(self, mock_say):
         """Test sayline says 'blank' for empty lines."""
         tdsr.sayline(2)  # Say empty line
         
         mock_say.assert_called_once_with("blank")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayline_with_indentation(self, mock_say):
         """Test sayline preserves leading spaces."""
         tdsr.sayline(4)  # Say indented line
         
         mock_say.assert_called_once_with("    Indented line")
     
-    @mock.patch('tdsr.say')
+    @mock.patch('tdsr.tdsr.say')
     def test_sayline_current_position(self, mock_say):
         """Test sayline without parameter uses current revy position."""
         tdsr.state.revy = 1
@@ -73,7 +85,7 @@ class TestScreenDataExtraction(unittest.TestCase):
             "Mixed    spacing  here"
         ])
         
-        tdsr.screen = self.screen
+        setup_tdsr_globals(self)
     
     def test_screen_line_extraction(self):
         """Test that we can correctly extract line content from screen."""
@@ -130,7 +142,7 @@ class TestGetLineFunction(unittest.TestCase):
             "Virtual line 2"
         ])
         
-        tdsr.screen = self.screen
+        setup_tdsr_globals(self)
     
     def test_current_line_access_pattern(self):
         """Test current pattern of accessing screen lines.
@@ -166,7 +178,7 @@ class TestRepeatedSymbolsProcessing(unittest.TestCase):
             "Normal text here"
         ])
         
-        tdsr.screen = self.screen
+        setup_tdsr_globals(self)
         
         # Configure state for repeated symbols processing
         tdsr.state.config['speech']['repeated_symbols'] = 'true'
