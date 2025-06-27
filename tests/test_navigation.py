@@ -166,8 +166,8 @@ class TestWordNavigation(unittest.TestCase):
         """Test sayword with spelling enabled."""
         tdsr.sayword(spell=True)
         
-        # Should call say with each character separated by spaces
-        mock_say.assert_called_once_with("w o r d 1")
+        # Should call say with each character separated by spaces and force_process_symbols=True
+        mock_say.assert_called_once_with("w o r d 1", force_process_symbols=True)
     
     @mock.patch('tdsr.tdsr.say')
     def test_nextword_movement(self, mock_say):
