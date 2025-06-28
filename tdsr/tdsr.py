@@ -898,21 +898,23 @@ def prevword():
 def sayword(spell=False):
 	word = ""
 	revx, revy = state.revx, state.revy
+	# Move to beginning of word
 	while state.revx > 0 and get_char() != ' ' and get_char_at(state.revy, state.revx - 1) != ' ':
 		move_prevchar()
 	if state.revx == 0 and get_char() == ' ':
 		say("space")
 		return
+	
+	# Build word WITHOUT crossing line boundaries
+	start_y = state.revy  # Remember which line we started on
 	word += get_char()
-	# Build word by moving forward, handling line boundaries properly
-	while True:
-		# Check if we're at end of current screen (can't go further)
-		if state.revy == screen.lines - 1 and state.revx == screen.columns - 1:
-			break
-		move_nextchar()
+	
+	while state.revx < screen.columns - 1:  # Stay within current line
+		state.revx += 1  # Move right one position
 		if get_char() == ' ':
 			break
 		word += get_char()
+	
 	if spell:
 		say(' '.join(word), force_process_symbols=True)
 	else:
